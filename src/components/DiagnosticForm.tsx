@@ -1,14 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, CheckCircle, MapPin, Building2, Mail, Sparkles, Loader2 } from "lucide-react";
+import { ArrowRight, CheckCircle, MapPin, Mail, Sparkles, Loader2 } from "lucide-react";
 
 type FormState = "idle" | "loading" | "success" | "error";
 
 export default function DiagnosticForm() {
   const [targetUrl, setTargetUrl] = useState("");
   const [email, setEmail] = useState("");
-  const [companyName, setCompanyName] = useState("");
   const [formState, setFormState] = useState<FormState>("idle");
   const [score, setScore] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
@@ -19,10 +18,31 @@ export default function DiagnosticForm() {
     setErrorMessage("");
 
     try {
+      let recaptchaToken = "fallback_token";
+      try {
+        if (typeof window !== "undefined" && (window as any).grecaptcha) {
+          recaptchaToken = await new Promise((resolve, reject) => {
+            (window as any).grecaptcha.ready(async () => {
+              try {
+                const token = await (window as any).grecaptcha.execute(
+                  process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY,
+                  { action: "submit_diagnosis" }
+                );
+                resolve(token);
+              } catch (err) {
+                reject(err);
+              }
+            });
+          });
+        }
+      } catch (err) {
+        console.error("reCAPTCHA generation failed:", err);
+      }
+
       const res = await fetch("/api/diagnose", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetUrl, email, companyName, recaptchaToken: "test_token" })
+        body: JSON.stringify({ targetUrl, email, recaptchaToken })
       });
       
       const data = await res.json();
@@ -34,7 +54,7 @@ export default function DiagnosticForm() {
       setScore(data.score);
       setFormState("success");
     } catch (error: any) {
-      setErrorMessage("診断中にエラーが発生しました。もう一度お試しください。");
+      setErrorMessage(error.message || "診断中にエラーが発生しました。もう一度お試しください。");
       setFormState("error");
     }
   };
@@ -97,20 +117,6 @@ export default function DiagnosticForm() {
       <div className="space-y-4">
         <div className="relative group">
           <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-            <Building2 className="w-5 h-5 text-neutral-500 group-focus-within:text-white transition-colors" />
-          </div>
-          <input
-            type="text"
-            required
-            value={companyName}
-            onChange={(e) => setCompanyName(e.target.value)}
-            className="w-full bg-neutral-900/50 border border-neutral-800 rounded-xl py-3.5 pl-11 pr-4 text-white placeholder:text-neutral-500 focus:outline-none focus:ring-1 focus:ring-white/30 focus:border-white/30 transition-all font-light"
-            placeholder="会社名・店舗名"
-          />
-        </div>
-
-        <div className="relative group">
-          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
             <MapPin className="w-5 h-5 text-neutral-500 group-focus-within:text-white transition-colors" />
           </div>
           <input
@@ -134,7 +140,7 @@ export default function DiagnosticForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="w-full bg-neutral-900/50 border border-neutral-800 rounded-xl py-3.5 pl-11 pr-4 text-white placeholder:text-neutral-500 focus:outline-none focus:ring-1 focus:ring-white/30 focus:border-white/30 transition-all font-light"
-            placeholder="レポート受け取り用メールアドレス"
+            placeholder="メールアドレス（必須）"
           />
         </div>
       </div>
@@ -143,7 +149,7 @@ export default function DiagnosticForm() {
         type="submit"
         className="w-full relative overflow-hidden group bg-white text-black font-medium py-3.5 rounded-xl transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 mt-4"
       >
-        <span className="relative z-10 font-bold">AI診断を無料で実行する</span>
+        <span className="relative z-10 font-bold">診断結果を見てみる</span>
         <ArrowRight className="w-4 h-4 relative z-10 group-hover:translate-x-1 transition-transform" />
       </button>
 
