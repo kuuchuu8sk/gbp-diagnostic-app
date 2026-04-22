@@ -254,35 +254,37 @@ ${JSON.stringify({ ...placeData, photos: undefined }, null, 2)}
       // 6. Send Email via Resend
       console.log(`[EMAIL] Sending full report to ${email}...`);
 
-      // 本番環境（Vercel）で環境変数が設定されていない場合に備え、直接フォールバックを追加
-      const adminEmail = process.env.EMAIL_NOTIFICATION_RECEIVER || "kuuchuu8sk@gmail.com";
-      const senderEmail = process.env.EMAIL_SENDER || 'onboarding@resend.dev';
+      if (resend) {
+        // 本番環境（Vercel）で環境変数が設定されていない場合に備え、直接フォールバックを追加
+        const adminEmail = process.env.EMAIL_NOTIFICATION_RECEIVER || "kuuchuu8sk@gmail.com";
+        const senderEmail = process.env.EMAIL_SENDER || 'onboarding@resend.dev';
 
-      // ユーザ向けメール
-      const clientMailPromise = resend.emails.send({
-        from: senderEmail,
-        to: email,
-        subject: `【AI診断完了】${placeData.name} のGoogleビジネスプロフィール解析結果`,
-        html: htmlTemplate
-      }).catch(err => console.error("[EMAIL] Client mail failed:", err));
+        // ユーザ向けメール
+        const clientMailPromise = resend.emails.send({
+          from: senderEmail,
+          to: email,
+          subject: `【AI診断完了】${placeData.name} のGoogleビジネスプロフィール解析結果`,
+          html: htmlTemplate
+        }).catch(err => console.error("[EMAIL] Client mail failed:", err));
 
-      // 管理者向けメール
-      const adminMailPromise = resend.emails.send({
-        from: senderEmail,
-        to: adminEmail,
-        subject: `【新規AI診断】${placeData.name} (${report.totalScore}点)`,
-        html: `
-          <div style="background-color: #ffeb3b; color: #333; padding: 15px; font-family: sans-serif; text-align: center; font-weight: bold;">
-            🚨 [管理者用通知] 新規のAI診断が実行されました<br>
-            クライアントEmail: ${email} <br>
-            対象マップURL: <a href="${targetUrl}">${targetUrl}</a>
-          </div>
-          ${htmlTemplate}
-        `
-      }).catch(err => console.error("[EMAIL] Admin mail failed:", err));
+        // 管理者向けメール
+        const adminMailPromise = resend.emails.send({
+          from: senderEmail,
+          to: adminEmail,
+          subject: `【新規AI診断】${placeData.name} (${report.totalScore}点)`,
+          html: `
+            <div style="background-color: #ffeb3b; color: #333; padding: 15px; font-family: sans-serif; text-align: center; font-weight: bold;">
+              🚨 [管理者用通知] 新規のAI診断が実行されました<br>
+              クライアントEmail: ${email} <br>
+              対象マップURL: <a href="${targetUrl}">${targetUrl}</a>
+            </div>
+            ${htmlTemplate}
+          `
+        }).catch(err => console.error("[EMAIL] Admin mail failed:", err));
 
-      // Vercel の 10秒タイムアウトを回避するため、2つのメール送信を「同時に」実行して待つ
-      await Promise.all([clientMailPromise, adminMailPromise]);
+        // Vercel の 10秒タイムアウトを回避するため、2つのメール送信を「同時に」実行して待つ
+        await Promise.all([clientMailPromise, adminMailPromise]);
+      }
 
     // 7. Return to frontend
     return NextResponse.json({ success: true, score: report.totalScore });
